@@ -6,7 +6,9 @@ import type { StorageAdapter } from "grammy";
 // bot grows. Durable domain data must NOT live here — use the toolkit's
 // persistent storage (see AGENTS.md).
 export interface Session {
-  // example: step?: "awaiting_amount";
+  giftState?: unknown; // harness/local fallback only; production state is Redis or ChatDO-backed
+  giftFlow?: "add-gift" | "remove-gift";
+  giftFlowStartedAt?: number;
 }
 
 export type Ctx = BotContext<Session>;

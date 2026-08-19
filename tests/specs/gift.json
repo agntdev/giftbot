@@ -7,7 +7,7 @@
           {
             "method": "sendMessage",
             "payload": {
-              "text": "Trigger an immediate giveaway"
+              
             }
           }
         ],
@@ -15,6 +15,22 @@
           "text": "/gift"
         }
       }
+    ]
+  },
+  {
+    "name": "active chatter can receive a button giveaway",
+    "steps": [
+      { "send": { "text": "I am here!" }, "expect": [] },
+      { "send": { "callback": "gift:run" }, "expect": [
+        { "method": "answerCallbackQuery" },
+        { "method": "editMessageText" }
+      ] }
+    ]
+  },
+  {
+    "name": "settings are protected outside a group",
+    "steps": [
+      { "send": { "callback": "gift:auto" }, "expect": [{ "method": "answerCallbackQuery" }] }
     ]
   }
 ]

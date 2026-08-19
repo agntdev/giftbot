@@ -8,9 +8,9 @@ async function main() {
     process.exit(1);
   }
   const bot = await buildBot(token);
-  // Publish the "/" command list to Telegram (discoverability). A button-first
-  // bot exposes only /start + /help; everything else is reached via menu buttons.
-  await setDefaultCommands(bot);
+  // /gift is the product's documented immediate-giveaway shortcut; menus remain
+  // the primary surface for everyone else.
+  await setDefaultCommands(bot, [{ command: "gift", description: "Run a giveaway now" }]);
   bot.start();
 }
 
