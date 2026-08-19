@@ -14,6 +14,7 @@
  */
 
 import type { StorageAdapter } from "grammy";
+import { now } from "../../clock.js";
 
 // Minimal shapes so this file type-checks without pulling @cloudflare/workers-types
 // into the Node build. The real bindings are provided by the Workers runtime.
@@ -49,6 +50,24 @@ interface Reminder {
   at: number; // epoch ms
   chatId: number | string;
   text: string;
+}
+
+interface AutomaticGift {
+  at: number;
+  chatId: number | string;
+}
+
+interface GiftStateLike {
+  participants: Array<{ user_id: number; username?: string; first_name: string; last_seen: number }>;
+  gifts: Array<{ gift_name: string; emoji: string }>;
+  events: Array<{ timestamp: number; winner_id: number; gift: { gift_name: string; emoji: string }; trigger: "manual" | "automatic" }>;
+  settings: { activeWindowMinutes: number; repeatProtection: number; intervalMinMinutes: number; intervalMaxMinutes: number; mentionFormat: "username" | "name"; automaticEnabled: boolean };
+}
+
+function secureIndex(length: number): number {
+  const bytes = new Uint32Array(1);
+  crypto.getRandomValues(bytes);
+  return bytes[0] % length;
 }
 
 /**
@@ -144,6 +163,31 @@ export class ChatDO {
       }
     }
 
+    // One durable, per-chat application record for features that need more than
+    // ephemeral grammY session state. Feature code maintains its own explicit
+    // indices inside this record; this DO never scans a keyspace.
+    if (url.pathname === "/gift-state") {
+      if (request.method === "GET") {
+        const value = await this.state.storage.get<unknown>("gift-state");
+        return value === undefined ? new Response(null, { status: 204 }) : Response.json(value);
+      }
+      if (request.method === "PUT") {
+        const value = await request.json() as GiftStateLike;
+        await this.state.storage.put("gift-state", value);
+        const existing = await this.state.storage.get<AutomaticGift>("automatic-gift");
+        if (!value.settings.automaticEnabled) {
+          await this.state.storage.delete("automatic-gift");
+        } else if (!existing) {
+          const min = Math.max(5, value.settings.intervalMinMinutes);
+          const max = Math.max(min, value.settings.intervalMaxMinutes);
+          const delay = min + secureIndex(max - min + 1);
+          await this.state.storage.put("automatic-gift", { at: now() + delay * 60_000, chatId: url.searchParams.get("chat") ?? "" });
+        }
+        await this.rearm((await this.state.storage.get<Reminder[]>("reminders")) ?? []);
+        return new Response(null, { status: 204 });
+      }
+    }
+
     // Schedule a reminder + (re)arm the alarm to the earliest due one.
     if (url.pathname === "/remind" && request.method === "POST") {
       const rem = (await request.json()) as Reminder;
@@ -160,20 +204,51 @@ export class ChatDO {
   // Fires at the earliest reminder's wall-clock time. Sends every due reminder,
   // drops them, and re-arms for whatever remains.
   async alarm(): Promise<void> {
-    const now = Date.now();
+    const current = now();
     const list = (await this.state.storage.get<Reminder[]>("reminders")) ?? [];
-    const due = list.filter((r) => r.at <= now);
-    const rest = list.filter((r) => r.at > now);
+    const due = list.filter((r) => r.at <= current);
+    const rest = list.filter((r) => r.at > current);
     for (const r of due) {
       await tg(this.env.BOT_TOKEN, "sendMessage", { chat_id: r.chatId, text: r.text });
     }
     await this.state.storage.put("reminders", rest);
+    const automatic = await this.state.storage.get<AutomaticGift>("automatic-gift");
+    if (automatic && automatic.at <= current) await this.runAutomaticGiveaway(automatic, current);
     await this.rearm(rest);
   }
 
+  private async runAutomaticGiveaway(automatic: AutomaticGift, current: number): Promise<void> {
+    const state = await this.state.storage.get<GiftStateLike>("gift-state");
+    if (!state || !state.settings.automaticEnabled) { await this.state.storage.delete("automatic-gift"); return; }
+    const cutoff = current - state.settings.activeWindowMinutes * 60_000;
+    const active = state.participants.filter((participant) => participant.last_seen >= cutoff);
+    const blocked = new Set(state.events.slice(-state.settings.repeatProtection).map((event) => event.winner_id));
+    const eligible = active.filter((participant) => !blocked.has(participant.user_id));
+    if (eligible.length && state.gifts.length) {
+      const winner = eligible[secureIndex(eligible.length)];
+      const gift = state.gifts[secureIndex(state.gifts.length)];
+      state.events.push({ timestamp: current, winner_id: winner.user_id, gift, trigger: "automatic" });
+      if (state.events.length > 100) state.events.splice(0, state.events.length - 100);
+      await this.state.storage.put("gift-state", state);
+      const name = state.settings.mentionFormat === "username" && winner.username ? `@${winner.username}` : winner.first_name;
+      // A blocked chat or transient Telegram failure must not prevent the next
+      // scheduled giveaway from being armed.
+      try {
+        await tg(this.env.BOT_TOKEN, "sendMessage", { chat_id: automatic.chatId, text: `🎁 ${name} wins ${gift.emoji} ${gift.gift_name}! Lucky you!` });
+      } catch {
+        // The durable event is retained and the schedule continues.
+      }
+    }
+    const min = Math.max(5, state.settings.intervalMinMinutes);
+    const max = Math.max(min, state.settings.intervalMaxMinutes);
+    await this.state.storage.put("automatic-gift", { at: current + (min + secureIndex(max - min + 1)) * 60_000, chatId: automatic.chatId });
+  }
+
   private async rearm(list: Reminder[]): Promise<void> {
-    if (list.length === 0) return;
-    const next = Math.min(...list.map((r) => r.at));
+    const automatic = await this.state.storage.get<AutomaticGift>("automatic-gift");
+    const times = [...list.map((r) => r.at), ...(automatic ? [automatic.at] : [])];
+    if (times.length === 0) return;
+    const next = Math.min(...times);
     const current = await this.state.storage.getAlarm();
     if (current === null || next < current) {
       await this.state.storage.setAlarm(next);

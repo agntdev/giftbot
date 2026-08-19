@@ -7,7 +7,7 @@
         "expect": [
           {
             "method": "sendMessage",
-            "payload": { "text": "👋 Welcome! Tap a button below to get started." }
+            "payload": { "text": "🎉 Ready to sprinkle some joy? Tap a button below." }
           }
         ]
       }

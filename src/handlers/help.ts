@@ -9,8 +9,8 @@ import { inlineButton, inlineKeyboard } from "../toolkit/index.js";
 const composer = new Composer<Ctx>();
 
 const HELP =
-  "ℹ️ Tap /start to open the menu, then pick what you want from the buttons.\n\n" +
-  "Everything in this bot is reachable by tapping — you don't need to remember any commands.";
+  "🎁 Tap /start to open the giveaway menu.\n\n" +
+  "Chat normally to join the active crowd, then tap Give a gift when it’s time to pick a lucky winner. You can also type /gift for an instant draw. Group admins can tune the gift basket and automatic giveaways in Settings.";
 
 const backToMenu = inlineKeyboard([[inlineButton("⬅️ Back to menu", "menu:main")]]);
 
