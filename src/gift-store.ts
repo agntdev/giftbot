@@ -15,30 +15,12 @@ export interface GiveawaySettings {
 }
 export interface GiftState { participants: Participant[]; gifts: Gift[]; events: GiveawayEvent[]; settings: GiveawaySettings }
 
-const DEFAULT_GIFTS: Gift[] = [
-  { gift_name: "Сверкающий значок", emoji: "✨" }, { gift_name: "Хлопушка", emoji: "🎉" },
-  { gift_name: "Счастливая звезда", emoji: "⭐" }, { gift_name: "Радужное угощение", emoji: "🌈" },
-  { gift_name: "Ракетный заряд", emoji: "🚀" }, { gift_name: "Солнечный жетон", emoji: "☀️" },
-  { gift_name: "Кекс радости", emoji: "🧁" }, { gift_name: "Хрустальное сердце", emoji: "💎" },
-  { gift_name: "Корона конфетти", emoji: "👑" }, { gift_name: "Сундук сокровищ", emoji: "🎁" },
-];
-
-const LEGACY_GIFT_NAMES: Record<string, string> = {
-  "Sparkle badge": "Сверкающий значок",
-  "Party popper": "Хлопушка",
-  "Lucky star": "Счастливая звезда",
-  "Rainbow treat": "Радужное угощение",
-  "Rocket boost": "Ракетный заряд",
-  "Sunshine token": "Солнечный жетон",
-  "Cupcake cheer": "Кекс радости",
-  "Crystal heart": "Хрустальное сердце",
-  "Confetti crown": "Корона конфетти",
-  "Treasure chest": "Сундук сокровищ",
-};
+/** The giveaway has one deliberately fixed prize. Existing pools are migrated on read. */
+export const TEDDY_BEAR_GIFT: Gift = { gift_name: "мишка", emoji: "🧸" };
 
 export function defaultGiftState(): GiftState {
-  return { participants: [], gifts: DEFAULT_GIFTS.map((gift) => ({ ...gift })), events: [], settings: { locale: "ru",
-    activeWindowMinutes: 30, repeatProtection: 2, intervalMinMinutes: 5,
+  return { participants: [], gifts: [{ ...TEDDY_BEAR_GIFT }], events: [], settings: { locale: "ru",
+    activeWindowMinutes: 30, repeatProtection: 2, intervalMinMinutes: 1,
     intervalMaxMinutes: 90, mentionFormat: "username", automaticEnabled: false,
   }};
 }
@@ -84,13 +66,12 @@ async function redisState(ctx: Ctx, next?: GiftState): Promise<GiftState | undef
 export async function readGiftState(ctx: Ctx): Promise<GiftState> {
   const state = await workerState(ctx as Ctx & WorkerLike) ?? await redisState(ctx) ?? (ctx.session.giftState as GiftState | undefined);
   if (!state) return defaultGiftState();
-  // Existing chat records predate the single-language setting. Keep them usable
-  // while making Russian the persisted, only available locale from this release.
+  // Migrate older chat records in place: the only prize and automatic interval
+  // are now fixed by the product rules, regardless of previous admin choices.
   state.settings.locale = "ru";
-  state.gifts = state.gifts.map((gift) => ({
-    ...gift,
-    gift_name: LEGACY_GIFT_NAMES[gift.gift_name] ?? gift.gift_name,
-  }));
+  state.gifts = [{ ...TEDDY_BEAR_GIFT }];
+  state.settings.intervalMinMinutes = 1;
+  state.settings.intervalMaxMinutes = 90;
   return state;
 }
 export async function writeGiftState(ctx: Ctx, state: GiftState): Promise<void> {

@@ -10,7 +10,7 @@ const composer = new Composer<Ctx>();
 
 const HELP =
   "🎁 Нажмите /start, чтобы открыть меню розыгрышей.\n\n" +
-  "Пишите в чате, чтобы участвовать в розыгрыше. Нажмите «Разыграть подарок», когда пора выбрать счастливчика, или отправьте /gift для мгновенного розыгрыша. Администраторы группы меняют подарки и автоподарки в настройках.";
+  "Пишите в чате, чтобы участвовать в розыгрыше. Нажмите «Разыграть подарок», когда пора выбрать счастливчика, или отправьте /gift для мгновенного розыгрыша мишки. Администраторы группы меняют правила активности и автоподарки в настройках.";
 
 const backToMenu = inlineKeyboard([[inlineButton("← В меню", "menu:main")]]);
 
@@ -19,8 +19,12 @@ composer.command("help", async (ctx) => {
 });
 
 composer.callbackQuery("menu:help", async (ctx) => {
-  await ctx.answerCallbackQuery();
-  await ctx.editMessageText(HELP, { reply_markup: backToMenu });
+  try { await ctx.answerCallbackQuery(); } catch { /* A stale menu tap is harmless. */ }
+  try {
+    await ctx.editMessageText(HELP, { reply_markup: backToMenu });
+  } catch {
+    await ctx.reply(HELP, { reply_markup: backToMenu });
+  }
 });
 
 export default composer;

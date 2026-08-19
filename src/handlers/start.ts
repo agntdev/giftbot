@@ -17,8 +17,12 @@ composer.command("start", async (ctx) => {
 
 // "Back to menu" — re-render the main menu in place from any sub-view.
 composer.callbackQuery("menu:main", async (ctx) => {
-  await ctx.answerCallbackQuery();
-  await ctx.editMessageText(WELCOME, { reply_markup: mainMenuKeyboard() });
+  try { await ctx.answerCallbackQuery(); } catch { /* A stale menu tap is harmless. */ }
+  try {
+    await ctx.editMessageText(WELCOME, { reply_markup: mainMenuKeyboard() });
+  } catch {
+    await ctx.reply(WELCOME, { reply_markup: mainMenuKeyboard() });
+  }
 });
 
 export default composer;

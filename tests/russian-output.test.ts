@@ -56,11 +56,11 @@ describe("русский интерфейс", () => {
     const values = new Map<string, unknown>();
     values.set("gift-state", {
       participants: [{ user_id: 7, first_name: "Соня", last_seen: 999_999 }],
-      gifts: [{ emoji: "🎈", gift_name: "Воздушный шар" }],
+      gifts: [{ emoji: "🧸", gift_name: "мишка" }],
       events: [],
       settings: {
         locale: "ru", activeWindowMinutes: 30, repeatProtection: 2,
-        intervalMinMinutes: 5, intervalMaxMinutes: 5, mentionFormat: "name", automaticEnabled: true,
+        intervalMinMinutes: 1, intervalMaxMinutes: 90, mentionFormat: "name", automaticEnabled: true,
       },
     });
     values.set("automatic-gift", { at: 999_999, chatId: -100 });

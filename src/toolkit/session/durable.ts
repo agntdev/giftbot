@@ -178,8 +178,8 @@ export class ChatDO {
         if (!value.settings.automaticEnabled) {
           await this.state.storage.delete("automatic-gift");
         } else if (!existing) {
-          const min = Math.max(5, value.settings.intervalMinMinutes);
-          const max = Math.max(min, value.settings.intervalMaxMinutes);
+          const min = 1;
+          const max = 90;
           const delay = min + secureIndex(max - min + 1);
           await this.state.storage.put("automatic-gift", { at: now() + delay * 60_000, chatId: url.searchParams.get("chat") ?? "" });
         }
@@ -224,9 +224,14 @@ export class ChatDO {
     const active = state.participants.filter((participant) => participant.last_seen >= cutoff);
     const blocked = new Set(state.events.slice(-state.settings.repeatProtection).map((event) => event.winner_id));
     const eligible = active.filter((participant) => !blocked.has(participant.user_id));
-    if (eligible.length && state.gifts.length) {
+    if (eligible.length) {
       const winner = eligible[secureIndex(eligible.length)];
-      const gift = state.gifts[secureIndex(state.gifts.length)];
+      // The gift pool is intentionally fixed. This also migrates an old
+      // Durable Object record before an automatic announcement can use it.
+      const gift = { gift_name: "мишка", emoji: "🧸" };
+      state.gifts = [gift];
+      state.settings.intervalMinMinutes = 1;
+      state.settings.intervalMaxMinutes = 90;
       state.events.push({ timestamp: current, winner_id: winner.user_id, gift, trigger: "automatic" });
       if (state.events.length > 100) state.events.splice(0, state.events.length - 100);
       await this.state.storage.put("gift-state", state);
@@ -234,13 +239,17 @@ export class ChatDO {
       // A blocked chat or transient Telegram failure must not prevent the next
       // scheduled giveaway from being armed.
       try {
-        await tg(this.env.BOT_TOKEN, "sendMessage", { chat_id: automatic.chatId, text: `🎁 ${name} получает ${gift.emoji} «${gift.gift_name}»! Вот это удача!` });
+        await tg(this.env.BOT_TOKEN, "sendMessage", { chat_id: automatic.chatId, text: `👏 Победитель: ${name} — получает мишка!` });
       } catch {
         // The durable event is retained and the schedule continues.
       }
     }
-    const min = Math.max(5, state.settings.intervalMinMinutes);
-    const max = Math.max(min, state.settings.intervalMaxMinutes);
+    state.gifts = [{ gift_name: "мишка", emoji: "🧸" }];
+    state.settings.intervalMinMinutes = 1;
+    state.settings.intervalMaxMinutes = 90;
+    const min = 1;
+    const max = 90;
+    await this.state.storage.put("gift-state", state);
     await this.state.storage.put("automatic-gift", { at: current + (min + secureIndex(max - min + 1)) * 60_000, chatId: automatic.chatId });
   }
 

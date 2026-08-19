@@ -6,9 +6,7 @@
         "expect": [
           {
             "method": "sendMessage",
-            "payload": {
-              
-            }
+            "payload": { "text": "👏 Победитель: Test — получает мишка!" }
           }
         ],
         "send": {
