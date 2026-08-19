@@ -26,8 +26,8 @@ describe("automatic giveaways", () => {
     values.set("automatic-gift", { at: current - 1, chatId: -100 });
     values.set("gift-state", {
       participants: [{ user_id: 7, username: "удача", first_name: "Соня", last_seen: current }],
-      gifts: [{ emoji: "⭐", gift_name: "Счастливая звезда" }], events: [],
-      settings: { locale: "ru", activeWindowMinutes: 30, repeatProtection: 2, intervalMinMinutes: 5, intervalMaxMinutes: 5, mentionFormat: "username", automaticEnabled: true },
+      gifts: [{ emoji: "🧸", gift_name: "мишка" }], events: [],
+      settings: { locale: "ru", activeWindowMinutes: 30, repeatProtection: 2, intervalMinMinutes: 1, intervalMaxMinutes: 90, mentionFormat: "username", automaticEnabled: true },
     });
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true })));
     vi.stubGlobal("fetch", fetchMock);
