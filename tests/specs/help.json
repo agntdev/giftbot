@@ -1,0 +1,27 @@
+[
+  {
+    "name": "/help explains the bot in plain language",
+    "steps": [
+      {
+        "send": { "text": "/help" },
+        "expect": [
+          {
+            "method": "sendMessage",
+            "payload": {
+              "text": "ℹ️ Tap /start to open the menu, then pick what you want from the buttons.\n\nEverything in this bot is reachable by tapping — you don't need to remember any commands."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "the Help menu button shows the same help text",
+    "steps": [
+      {
+        "send": { "callback": "menu:help" },
+        "expect": [{ "method": "editMessageText" }]
+      }
+    ]
+  }
+]

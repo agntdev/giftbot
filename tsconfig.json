@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": "src",
+    "outDir": "dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": false
+  },
+  "include": ["src"],
+  "//": "Workers-only entry + its Workers-runtime deps are built by esbuild (npm run build:worker) and type-checked via tsconfig.worker.json — excluded here so the Node/Fly `npm run build` never compiles Workers globals.",
+  "exclude": ["src/worker.ts", "src/handlers.generated.ts", "src/toolkit/session/durable.ts"]
+}

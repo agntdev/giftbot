@@ -1,0 +1,5 @@
+{
+  "//": "Cloudflare deploy metadata read by agnt-api's cf-bot-deploy container. do_classes → Durable Object bindings; new_sqlite_classes → the DO migration sent on first deploy. Keep in sync with the classes exported from src/worker.ts.",
+  "do_classes": ["ChatDO"],
+  "new_sqlite_classes": ["ChatDO"]
+}

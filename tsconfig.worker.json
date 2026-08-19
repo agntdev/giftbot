@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src/worker.ts", "src/handlers.generated.ts", "src/toolkit/session/durable.ts", "src/bot.ts"],
+  "exclude": []
+}
