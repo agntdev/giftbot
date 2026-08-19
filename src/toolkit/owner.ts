@@ -101,8 +101,8 @@ export async function requireOwner(ctx: OwnerAwareCtx): Promise<boolean> {
 
   const unset = adminChatId(ctx) === undefined;
   const text = unset
-    ? "Owner access isn't set up yet."
-    : "Only the owner can do that.";
+    ? "Доступ владельца ещё не настроен."
+    : "Это может делать только владелец.";
 
   try {
     if (ctx.answerCallbackQuery) {

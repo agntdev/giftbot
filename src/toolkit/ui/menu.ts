@@ -58,7 +58,7 @@ export function mainMenuKeyboard(columns = 2): InlineKeyboardMarkup {
   for (let i = 0; i < items.length; i += cols) {
     rows.push(items.slice(i, i + cols).map((it) => inlineButton(it.label, it.data)));
   }
-  rows.push([inlineButton("❓ Help", "menu:help")]);
+  rows.push([inlineButton("❓ Помощь", "menu:help")]);
   return inlineKeyboard(rows);
 }
 

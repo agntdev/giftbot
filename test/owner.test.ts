@@ -78,7 +78,7 @@ describe("isOwner / requireOwner", () => {
         answerCallbackQuery: answer,
       }),
     ).toBe(false);
-    expect(strangerReply).toHaveBeenCalledWith("Only the owner can do that.");
+    expect(strangerReply).toHaveBeenCalledWith("Это может делать только владелец.");
     expect(answer).toHaveBeenCalled();
   });
 
@@ -94,7 +94,7 @@ describe("isOwner / requireOwner", () => {
           reply,
         }),
       ).toBe(false);
-      expect(reply).toHaveBeenCalledWith("Owner access isn't set up yet.");
+      expect(reply).toHaveBeenCalledWith("Доступ владельца ещё не настроен.");
     } finally {
       if (prev !== undefined) process.env.ADMIN_CHAT_ID = prev;
     }

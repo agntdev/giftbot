@@ -34,7 +34,7 @@ describe("main-menu registry", () => {
       { text: "Two", callback_data: "two" },
     ]);
     const last = kb.inline_keyboard[kb.inline_keyboard.length - 1];
-    expect(last).toEqual([{ text: "❓ Help", callback_data: "menu:help" }]);
+    expect(last).toEqual([{ text: "❓ Помощь", callback_data: "menu:help" }]);
   });
 
   it("respects the columns argument", () => {

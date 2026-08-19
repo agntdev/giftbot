@@ -9,7 +9,7 @@ import { mainMenuKeyboard } from "../toolkit/index.js";
 // file to add a feature. Send ONE message — no placeholder line above the menu.
 const composer = new Composer<Ctx>();
 
-const WELCOME = "🎉 Ready to sprinkle some joy? Tap a button below.";
+const WELCOME = "🎉 Готовы добавить чату немного радости? Нажмите кнопку ниже.";
 
 composer.command("start", async (ctx) => {
   await ctx.reply(WELCOME, { reply_markup: mainMenuKeyboard() });

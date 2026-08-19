@@ -61,7 +61,7 @@ interface GiftStateLike {
   participants: Array<{ user_id: number; username?: string; first_name: string; last_seen: number }>;
   gifts: Array<{ gift_name: string; emoji: string }>;
   events: Array<{ timestamp: number; winner_id: number; gift: { gift_name: string; emoji: string }; trigger: "manual" | "automatic" }>;
-  settings: { activeWindowMinutes: number; repeatProtection: number; intervalMinMinutes: number; intervalMaxMinutes: number; mentionFormat: "username" | "name"; automaticEnabled: boolean };
+  settings: { locale: "ru"; activeWindowMinutes: number; repeatProtection: number; intervalMinMinutes: number; intervalMaxMinutes: number; mentionFormat: "username" | "name"; automaticEnabled: boolean };
 }
 
 function secureIndex(length: number): number {
@@ -234,7 +234,7 @@ export class ChatDO {
       // A blocked chat or transient Telegram failure must not prevent the next
       // scheduled giveaway from being armed.
       try {
-        await tg(this.env.BOT_TOKEN, "sendMessage", { chat_id: automatic.chatId, text: `🎁 ${name} wins ${gift.emoji} ${gift.gift_name}! Lucky you!` });
+        await tg(this.env.BOT_TOKEN, "sendMessage", { chat_id: automatic.chatId, text: `🎁 ${name} получает ${gift.emoji} «${gift.gift_name}»! Вот это удача!` });
       } catch {
         // The durable event is retained and the schedule continues.
       }
