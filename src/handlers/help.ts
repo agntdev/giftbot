@@ -9,10 +9,10 @@ import { inlineButton, inlineKeyboard } from "../toolkit/index.js";
 const composer = new Composer<Ctx>();
 
 const HELP =
-  "🎁 Tap /start to open the giveaway menu.\n\n" +
-  "Chat normally to join the active crowd, then tap Give a gift when it’s time to pick a lucky winner. You can also type /gift for an instant draw. Group admins can tune the gift basket and automatic giveaways in Settings.";
+  "🎁 Нажмите /start, чтобы открыть меню розыгрышей.\n\n" +
+  "Пишите в чате, чтобы участвовать в розыгрыше. Нажмите «Разыграть подарок», когда пора выбрать счастливчика, или отправьте /gift для мгновенного розыгрыша. Администраторы группы меняют подарки и автоподарки в настройках.";
 
-const backToMenu = inlineKeyboard([[inlineButton("⬅️ Back to menu", "menu:main")]]);
+const backToMenu = inlineKeyboard([[inlineButton("← В меню", "menu:main")]]);
 
 composer.command("help", async (ctx) => {
   await ctx.reply(HELP);

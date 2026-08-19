@@ -4,14 +4,14 @@ import { inlineButton, inlineKeyboard, registerMainMenuItem } from "../toolkit/i
 import { readGiftState, runGiveaway, trackParticipant, writeGiftState, type Gift } from "../gift-store.js";
 import { now } from "../clock.js";
 
-registerMainMenuItem({ label: "🎁 Give a gift", data: "gift:run", order: 10 });
-registerMainMenuItem({ label: "⚙️ Giveaway settings", data: "gift:settings", order: 20 });
+registerMainMenuItem({ label: "🎁 Разыграть подарок", data: "gift:run", order: 10 });
+registerMainMenuItem({ label: "⚙️ Настройки розыгрыша", data: "gift:settings", order: 20 });
 
 const composer = new Composer<Ctx>();
 
 async function mayManage(ctx: Ctx): Promise<boolean> {
   if (ctx.chat?.type !== "group" && ctx.chat?.type !== "supergroup") {
-    await ctx.answerCallbackQuery({ text: "Open this in your group to manage giveaways.", show_alert: true });
+    await ctx.answerCallbackQuery({ text: "Откройте настройки в группе, где проходит розыгрыш.", show_alert: true });
     return false;
   }
   if (!ctx.from) return false;
@@ -21,7 +21,7 @@ async function mayManage(ctx: Ctx): Promise<boolean> {
   } catch {
     // Telegram only reveals this when the bot can inspect the group membership.
   }
-  await ctx.answerCallbackQuery({ text: "Only a group admin can change giveaway settings.", show_alert: true });
+  await ctx.answerCallbackQuery({ text: "Менять настройки может только администратор группы.", show_alert: true });
   return false;
 }
 
@@ -32,23 +32,31 @@ composer.callbackQuery(/^gift:(settings|gifts|add|remove|window|repeat|auto|inte
 });
 
 function homeKeyboard() {
-  return inlineKeyboard([[inlineButton("🎁 Give a gift", "gift:run")], [inlineButton("⬅️ Back to menu", "menu:main")]]);
+  return inlineKeyboard([[inlineButton("🎁 Разыграть подарок", "gift:run")], [inlineButton("← В меню", "menu:main")]]);
 }
 function settingsKeyboard() {
   return inlineKeyboard([
-    [inlineButton("🎁 Edit gifts", "gift:gifts"), inlineButton("⏱ Active window", "gift:window")],
-    [inlineButton("🛡 Repeat protection", "gift:repeat"), inlineButton("🔁 Auto giveaways", "gift:auto")],
-    [inlineButton("💬 Mention style", "gift:mention"), inlineButton("⬅️ Back to menu", "menu:main")],
+    [inlineButton("🎁 Изменить подарки", "gift:gifts"), inlineButton("⏱ Окно активности", "gift:window")],
+    [inlineButton("🛡 Защита повторов", "gift:repeat"), inlineButton("🔁 Автоподарки", "gift:auto")],
+    [inlineButton("💬 Формат имени", "gift:mention"), inlineButton("← В меню", "menu:main")],
   ]);
 }
 function winnerName(person: { username?: string; first_name: string }, mention: "username" | "name"): string {
   return mention === "username" && person.username ? `@${person.username}` : person.first_name;
 }
 function resultText(result: Awaited<ReturnType<typeof runGiveaway>>, mention: "username" | "name"): string {
-  if (result.kind === "winner") return `🎁 ${winnerName(result.participant, mention)} wins ${result.gift.emoji} ${result.gift.gift_name}! Lucky you!`;
-  if (result.kind === "empty-gifts") return "The gift basket is empty — an admin can add a treat in Giveaway settings.";
-  if (result.kind === "no-active") return "No one has been active lately — let the chat warm up, then try again.";
-  return "Everyone active has won recently — give the chat a moment, then try again.";
+  if (result.kind === "winner") return `🎁 ${winnerName(result.participant, mention)} получает ${result.gift.emoji} «${result.gift.gift_name}»! Вот это удача!`;
+  if (result.kind === "empty-gifts") return "Корзинка подарков пуста — администратор может добавить подарок в настройках.";
+  if (result.kind === "no-active") return "Пока никто не был активен — дайте чату оживиться и попробуйте ещё раз.";
+  return "Все активные участники недавно выигрывали — дайте чату немного времени и попробуйте ещё раз.";
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat("ru-RU").format(value);
+}
+
+function hasRussianName(value: string): boolean {
+  return /[А-Яа-яЁё]/u.test(value);
 }
 
 async function giveaway(ctx: Ctx, edit: boolean): Promise<void> {
@@ -72,16 +80,16 @@ composer.callbackQuery("gift:run", async (ctx) => {
 
 composer.callbackQuery("gift:settings", async (ctx) => {
   await ctx.answerCallbackQuery();
-  await ctx.editMessageText("Tune your giveaways here. Pick a setting to change.", { reply_markup: settingsKeyboard() });
+  await ctx.editMessageText("Настройте розыгрыши здесь. Выберите, что изменить.", { reply_markup: settingsKeyboard() });
 });
 
 composer.callbackQuery("gift:gifts", async (ctx) => {
   await ctx.answerCallbackQuery();
   const state = await readGiftState(ctx);
-  const list = state.gifts.map((gift) => `${gift.emoji} ${gift.gift_name}`).join("\n") || "No gifts yet";
-  await ctx.editMessageText(`Your gift basket:\n${list}`, { reply_markup: inlineKeyboard([
-    [inlineButton("➕ Add a gift", "gift:add"), inlineButton("➖ Remove a gift", "gift:remove")],
-    [inlineButton("⬅️ Settings", "gift:settings")],
+  const list = state.gifts.map((gift) => `${gift.emoji} ${gift.gift_name}`).join("\n") || "Подарков пока нет — добавьте первый.";
+  await ctx.editMessageText(`Ваша корзинка подарков:\n${list}`, { reply_markup: inlineKeyboard([
+    [inlineButton("➕ Добавить подарок", "gift:add"), inlineButton("➖ Убрать подарок", "gift:remove")],
+    [inlineButton("← Настройки", "gift:settings")],
   ]) });
 });
 
@@ -89,21 +97,21 @@ composer.callbackQuery("gift:add", async (ctx) => {
   await ctx.answerCallbackQuery();
   ctx.session.giftFlow = "add-gift";
   ctx.session.giftFlowStartedAt = now();
-  await ctx.reply("Send the gift as an emoji and name, like 🎈 Balloon.", { reply_markup: { force_reply: true, input_field_placeholder: "🎈 Balloon" } });
+  await ctx.reply("Отправьте эмодзи и русское название подарка, например 🎈 Воздушный шар.", { reply_markup: { force_reply: true, input_field_placeholder: "🎈 Воздушный шар" } });
 });
 
 composer.callbackQuery("gift:remove", async (ctx) => {
   await ctx.answerCallbackQuery();
   ctx.session.giftFlow = "remove-gift";
   ctx.session.giftFlowStartedAt = now();
-  await ctx.reply("Send the exact gift name you want to remove.", { reply_markup: { force_reply: true, input_field_placeholder: "Gift name" } });
+  await ctx.reply("Отправьте точное название подарка, который хотите убрать.", { reply_markup: { force_reply: true, input_field_placeholder: "Название подарка" } });
 });
 
 composer.callbackQuery("gift:window", async (ctx) => {
   await ctx.answerCallbackQuery();
-  await ctx.editMessageText("How recently should someone have chatted?", { reply_markup: inlineKeyboard([
-    [inlineButton("15 minutes", "gift:window:15"), inlineButton("30 minutes", "gift:window:30"), inlineButton("60 minutes", "gift:window:60")],
-    [inlineButton("⬅️ Settings", "gift:settings")],
+  await ctx.editMessageText("Как давно участник должен был писать в чат?", { reply_markup: inlineKeyboard([
+    [inlineButton("15 минут", "gift:window:15"), inlineButton("30 минут", "gift:window:30"), inlineButton("60 минут", "gift:window:60")],
+    [inlineButton("← Настройки", "gift:settings")],
   ]) });
 });
 
@@ -111,56 +119,56 @@ composer.callbackQuery(/^gift:window:(15|30|60)$/, async (ctx) => {
   await ctx.answerCallbackQuery();
   const minutes = Number(ctx.match[1]); const state = await readGiftState(ctx);
   state.settings.activeWindowMinutes = minutes; await writeGiftState(ctx, state);
-  await ctx.editMessageText(`Active window set to ${minutes} minutes.`, { reply_markup: settingsKeyboard() });
+  await ctx.editMessageText(`Окно активности: ${formatNumber(minutes)} мин.`, { reply_markup: settingsKeyboard() });
 });
 
 composer.callbackQuery("gift:repeat", async (ctx) => {
   await ctx.answerCallbackQuery();
-  await ctx.editMessageText("How many recent winners should sit out?", { reply_markup: inlineKeyboard([
-    [inlineButton("1 winner", "gift:repeat:1"), inlineButton("2 winners", "gift:repeat:2"), inlineButton("3 winners", "gift:repeat:3")],
-    [inlineButton("⬅️ Settings", "gift:settings")],
+  await ctx.editMessageText("Сколько последних победителей пропускают розыгрыш?", { reply_markup: inlineKeyboard([
+    [inlineButton("1 победитель", "gift:repeat:1"), inlineButton("2 победителя", "gift:repeat:2"), inlineButton("3 победителя", "gift:repeat:3")],
+    [inlineButton("← Настройки", "gift:settings")],
   ]) });
 });
 composer.callbackQuery(/^gift:repeat:(1|2|3)$/, async (ctx) => {
   await ctx.answerCallbackQuery();
   const value = Number(ctx.match[1]); const state = await readGiftState(ctx);
   state.settings.repeatProtection = value; await writeGiftState(ctx, state);
-  await ctx.editMessageText(`The last ${value} winner${value === 1 ? "" : "s"} will sit out.`, { reply_markup: settingsKeyboard() });
+  await ctx.editMessageText(`Последние ${formatNumber(value)} победителя пропустят розыгрыш.`, { reply_markup: settingsKeyboard() });
 });
 
 composer.callbackQuery("gift:auto", async (ctx) => {
   await ctx.answerCallbackQuery();
   const state = await readGiftState(ctx);
-  const status = state.settings.automaticEnabled ? "on" : "off";
-  await ctx.editMessageText(`Automatic giveaways are ${status}.`, { reply_markup: inlineKeyboard([
-    [inlineButton("Turn on", "gift:auto:on"), inlineButton("Turn off", "gift:auto:off")],
-    [inlineButton("5–30 minutes", "gift:interval:5:30"), inlineButton("30–90 minutes", "gift:interval:30:90")],
-    [inlineButton("⬅️ Settings", "gift:settings")],
+  const status = state.settings.automaticEnabled ? "включены" : "выключены";
+  await ctx.editMessageText(`Автоподарки ${status}.`, { reply_markup: inlineKeyboard([
+    [inlineButton("Включить", "gift:auto:on"), inlineButton("Выключить", "gift:auto:off")],
+    [inlineButton("5–30 минут", "gift:interval:5:30"), inlineButton("30–90 минут", "gift:interval:30:90")],
+    [inlineButton("← Настройки", "gift:settings")],
   ]) });
 });
 composer.callbackQuery(/^gift:auto:(on|off)$/, async (ctx) => {
   await ctx.answerCallbackQuery();
   const on = ctx.match[1] === "on"; const state = await readGiftState(ctx);
   state.settings.automaticEnabled = on; await writeGiftState(ctx, state);
-  await ctx.editMessageText(on ? "Automatic giveaways are on — let the fun begin!" : "Automatic giveaways are paused.", { reply_markup: settingsKeyboard() });
+  await ctx.editMessageText(on ? "Автоподарки включены — начинаем веселье!" : "Автоподарки на паузе.", { reply_markup: settingsKeyboard() });
 });
 composer.callbackQuery(/^gift:interval:(5|30):(30|90)$/, async (ctx) => {
   await ctx.answerCallbackQuery();
   const state = await readGiftState(ctx); state.settings.intervalMinMinutes = Number(ctx.match[1]); state.settings.intervalMaxMinutes = Number(ctx.match[2]); await writeGiftState(ctx, state);
-  await ctx.editMessageText(`Auto giveaways will land every ${ctx.match[1]}–${ctx.match[2]} minutes.`, { reply_markup: settingsKeyboard() });
+  await ctx.editMessageText(`Автоподарки будут проходить каждые ${formatNumber(Number(ctx.match[1]))}–${formatNumber(Number(ctx.match[2]))} мин.`, { reply_markup: settingsKeyboard() });
 });
 
 composer.callbackQuery("gift:mention", async (ctx) => {
   await ctx.answerCallbackQuery();
-  await ctx.editMessageText("How should winners be named?", { reply_markup: inlineKeyboard([
-    [inlineButton("Use @username", "gift:mention:username"), inlineButton("Use first name", "gift:mention:name")],
-    [inlineButton("⬅️ Settings", "gift:settings")],
+  await ctx.editMessageText("Как показывать имя победителя?", { reply_markup: inlineKeyboard([
+    [inlineButton("Использовать @username", "gift:mention:username"), inlineButton("Использовать имя", "gift:mention:name")],
+    [inlineButton("← Настройки", "gift:settings")],
   ]) });
 });
 composer.callbackQuery(/^gift:mention:(username|name)$/, async (ctx) => {
   await ctx.answerCallbackQuery();
   const state = await readGiftState(ctx); state.settings.mentionFormat = ctx.match[1] as "username" | "name"; await writeGiftState(ctx, state);
-  await ctx.editMessageText(`Winner names will use ${ctx.match[1] === "username" ? "@usernames when available" : "first names"}.`, { reply_markup: settingsKeyboard() });
+  await ctx.editMessageText(ctx.match[1] === "username" ? "Будем использовать @username, если он есть." : "Будем использовать имя участника.", { reply_markup: settingsKeyboard() });
 });
 
 composer.on("message:text", async (ctx, next) => {
@@ -169,7 +177,7 @@ composer.on("message:text", async (ctx, next) => {
   if ((ctx.session.giftFlowStartedAt ?? 0) + 5 * 60_000 < now()) {
     ctx.session.giftFlow = undefined;
     ctx.session.giftFlowStartedAt = undefined;
-    await ctx.reply("That gift edit timed out — tap Edit gifts to start again.");
+    await ctx.reply("Время на изменение подарка вышло — нажмите «Изменить подарки» и начните снова.");
     return;
   }
   const input = ctx.message.text.trim(); const state = await readGiftState(ctx);
@@ -177,14 +185,14 @@ composer.on("message:text", async (ctx, next) => {
   ctx.session.giftFlowStartedAt = undefined;
   if (flow === "add-gift") {
     const match = input.match(/^(\S+)\s+(.+)$/);
-    if (!match) { await ctx.reply("That needs an emoji and a name, like 🎈 Balloon. Try again from Edit gifts."); return; }
+    if (!match || !hasRussianName(match[2])) { await ctx.reply("Нужны эмодзи и русское название, например 🎈 Воздушный шар. Попробуйте снова через «Изменить подарки»."); return; }
     state.gifts.push({ emoji: match[1], gift_name: match[2].slice(0, 60) }); await writeGiftState(ctx, state);
-    await ctx.reply(`${match[1]} ${match[2].slice(0, 60)} is in the basket!`); return;
+    await ctx.reply(`${match[1]} ${match[2].slice(0, 60)} уже в корзинке!`); return;
   }
   const index = state.gifts.findIndex((gift: Gift) => gift.gift_name.toLowerCase() === input.toLowerCase());
-  if (index < 0) { await ctx.reply("I couldn't find that gift. Check the name and try again from Edit gifts."); return; }
+  if (index < 0) { await ctx.reply("Не нашёл такой подарок. Проверьте название и попробуйте снова через «Изменить подарки»."); return; }
   const [removed] = state.gifts.splice(index, 1); await writeGiftState(ctx, state);
-  await ctx.reply(`${removed.emoji} ${removed.gift_name} is out of the basket.`);
+  await ctx.reply(`${removed.emoji} ${removed.gift_name} убран из корзинки.`);
 });
 
 export default composer;

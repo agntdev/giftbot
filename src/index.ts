@@ -10,7 +10,7 @@ async function main() {
   const bot = await buildBot(token);
   // /gift is the product's documented immediate-giveaway shortcut; menus remain
   // the primary surface for everyone else.
-  await setDefaultCommands(bot, [{ command: "gift", description: "Run a giveaway now" }]);
+  await setDefaultCommands(bot, [{ command: "gift", description: "Разыграть подарок сейчас" }]);
   bot.start();
 }
 
