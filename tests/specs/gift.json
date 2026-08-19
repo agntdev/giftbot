@@ -1,0 +1,20 @@
+[
+  {
+    "name": "/gift",
+    "steps": [
+      {
+        "expect": [
+          {
+            "method": "sendMessage",
+            "payload": {
+              "text": "Trigger an immediate giveaway"
+            }
+          }
+        ],
+        "send": {
+          "text": "/gift"
+        }
+      }
+    ]
+  }
+]
