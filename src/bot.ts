@@ -55,7 +55,9 @@ export async function buildBot(token: string, opts: BuildBotOptions = {}) {
   const handlers = opts.handlers ?? (await loadHandlersFromDisk());
   for (const h of handlers) bot.use(h);
 
-  bot.on("message", (ctx) => ctx.reply("Не понял сообщение. Нажмите /help, и я подскажу."));
+  // Non-command messages are consumed by handlers/activity.ts after their
+  // activity timestamp is stored. Do not add a chat reply here: ambient group
+  // updates (text, media, forwards, and replies) must remain silent.
 
   return bot;
 }

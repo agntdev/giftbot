@@ -14,13 +14,14 @@ describe("buildBot handler loader", () => {
     expect(suite.passed).toBeGreaterThan(0);
   });
 
-  it("unknown input falls through to the global fallback", async () => {
+  it("ordinary input is silent after activity tracking", async () => {
     const suite = await runSpecs(() => buildBot("test-token"), [
       parseBotSpec({
-        name: "unknown text hits the fallback",
+        name: "ordinary text produces no Bot API calls",
+        strict: true,
         steps: [
           { send: { text: "qwerty" },
-            expect: [{ method: "sendMessage", payload: { text: "Не понял сообщение. Нажмите /help, и я подскажу." } }] },
+            expect: [] },
         ],
       }),
     ]);

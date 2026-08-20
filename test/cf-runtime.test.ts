@@ -19,10 +19,11 @@ describe("buildBot({ handlers }) — the Workers manifest path", () => {
       }),
       parseBotSpec({
         name: "disk handler /start is NOT loaded on the manifest path",
+        strict: true,
         steps: [
           {
             send: { text: "/start" },
-            expect: [{ method: "sendMessage", payload: { text: "Не понял сообщение. Нажмите /help, и я подскажу." } }],
+            expect: [],
           },
         ],
       }),
