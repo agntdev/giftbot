@@ -178,7 +178,7 @@ export class ChatDO {
         if (!value.settings.automaticEnabled) {
           await this.state.storage.delete("automatic-gift");
         } else if (!existing) {
-          const min = Math.min(90, Math.max(5, value.settings.intervalMinMinutes));
+          const min = Math.min(90, Math.max(1, value.settings.intervalMinMinutes));
           const max = Math.min(90, Math.max(min, value.settings.intervalMaxMinutes));
           const delay = min + secureIndex(max - min + 1);
           await this.state.storage.put("automatic-gift", { at: now() + delay * 60_000, chatId: url.searchParams.get("chat") ?? "" });
@@ -247,7 +247,7 @@ export class ChatDO {
   }
 
   private async scheduleNextAutomaticGift(state: GiftStateLike, chatId: number | string, current: number): Promise<void> {
-    const min = Math.min(90, Math.max(5, state.settings.intervalMinMinutes));
+    const min = Math.min(90, Math.max(1, state.settings.intervalMinMinutes));
     const max = Math.min(90, Math.max(min, state.settings.intervalMaxMinutes));
     await this.state.storage.put("gift-state", state);
     await this.state.storage.put("automatic-gift", { at: current + (min + secureIndex(max - min + 1)) * 60_000, chatId });
