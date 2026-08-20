@@ -1,6 +1,6 @@
 [
   {
-    "name": "ordinary activity is recorded without a chat reply",
+    "name": "ordinary activity is processed without a chat reply",
     "strict": true,
     "steps": [
       {

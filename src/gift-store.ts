@@ -12,21 +12,17 @@ export interface GiveawaySettings {
   intervalMaxMinutes: number;
   mentionFormat: "username" | "name";
   automaticEnabled: boolean;
+  /** Node/Fly fallback: an activity update runs a due giveaway when no DO alarm exists. */
+  nextAutomaticAt?: number;
 }
 export interface GiftState { participants: Participant[]; gifts: Gift[]; events: GiveawayEvent[]; settings: GiveawaySettings }
 
-/** A fresh chat starts with a cheerful, usable pool of ten virtual gifts. */
-export const DEFAULT_GIFTS: readonly Gift[] = [
-  { gift_name: "мишка", emoji: "🧸" }, { gift_name: "звезда", emoji: "⭐" },
-  { gift_name: "букет", emoji: "💐" }, { gift_name: "торт", emoji: "🍰" },
-  { gift_name: "ракета", emoji: "🚀" }, { gift_name: "корона", emoji: "👑" },
-  { gift_name: "радуга", emoji: "🌈" }, { gift_name: "конфета", emoji: "🍬" },
-  { gift_name: "воздушный шар", emoji: "🎈" }, { gift_name: "кубок", emoji: "🏆" },
-];
+/** The owner-selected prize: every giveaway awards the bear. */
+export const DEFAULT_GIFTS: readonly Gift[] = [{ gift_name: "мишка", emoji: "🧸" }];
 
 export function defaultGiftState(): GiftState {
   return { participants: [], gifts: DEFAULT_GIFTS.map((gift) => ({ ...gift })), events: [], settings: { locale: "ru",
-    activeWindowMinutes: 30, repeatProtection: 2, intervalMinMinutes: 5,
+    activeWindowMinutes: 30, repeatProtection: 2, intervalMinMinutes: 1,
     intervalMaxMinutes: 90, mentionFormat: "username", automaticEnabled: false,
   }};
 }
@@ -70,7 +66,10 @@ export async function readGiftState(ctx: Ctx): Promise<GiftState> {
   const state = await workerState(ctx as Ctx & WorkerLike) ?? await redisState(ctx) ?? (ctx.session.giftState as GiftState | undefined);
   if (!state) return defaultGiftState();
   state.settings.locale = "ru";
-  state.settings.intervalMinMinutes = Math.min(90, Math.max(5, state.settings.intervalMinMinutes));
+  // Existing chats may have an older multi-gift pool. The owner now offers only
+  // the bear, so normalize the durable record before every giveaway as well.
+  state.gifts = DEFAULT_GIFTS.map((gift) => ({ ...gift }));
+  state.settings.intervalMinMinutes = Math.min(90, Math.max(1, state.settings.intervalMinMinutes));
   state.settings.intervalMaxMinutes = Math.min(90, Math.max(state.settings.intervalMinMinutes, state.settings.intervalMaxMinutes));
   return state;
 }
@@ -114,4 +113,37 @@ export async function runGiveaway(ctx: Ctx, trigger: "manual" | "automatic"): Pr
   if (state.events.length > 100) state.events.splice(0, state.events.length - 100);
   await writeGiftState(ctx, state);
   return { kind: "winner", participant, gift };
+}
+
+function automaticDelayMs(settings: GiveawaySettings): number {
+  const min = Math.min(90, Math.max(1, settings.intervalMinMinutes));
+  const max = Math.min(90, Math.max(min, settings.intervalMaxMinutes));
+  return (min + randomIndex(max - min + 1)) * 60_000;
+}
+
+/**
+ * Fly has no Durable Object alarm. When chat activity arrives, it advances any
+ * due automatic giveaway from the durable per-chat record. Workers use their
+ * exact DO alarm instead, so the two schedulers cannot announce the same draw.
+ */
+export async function runDueAutomaticGiveaway(ctx: Ctx): Promise<GiveawayResult | undefined> {
+  if ((ctx as Ctx & { env?: unknown }).env) return undefined;
+  const state = await readGiftState(ctx);
+  if (!state.settings.automaticEnabled) return undefined;
+  const current = now();
+  if (!state.settings.nextAutomaticAt) {
+    state.settings.nextAutomaticAt = current + automaticDelayMs(state.settings);
+    await writeGiftState(ctx, state);
+    return undefined;
+  }
+  if (state.settings.nextAutomaticAt > current) return undefined;
+  const result = await runGiveaway(ctx, "automatic");
+  const updated = await readGiftState(ctx);
+  updated.settings.nextAutomaticAt = current + automaticDelayMs(updated.settings);
+  await writeGiftState(ctx, updated);
+  return result;
+}
+
+export function scheduleNextAutomaticGiveaway(state: GiftState): void {
+  state.settings.nextAutomaticAt = now() + automaticDelayMs(state.settings);
 }
