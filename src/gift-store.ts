@@ -15,12 +15,18 @@ export interface GiveawaySettings {
 }
 export interface GiftState { participants: Participant[]; gifts: Gift[]; events: GiveawayEvent[]; settings: GiveawaySettings }
 
-/** The giveaway has one deliberately fixed prize. Existing pools are migrated on read. */
-export const TEDDY_BEAR_GIFT: Gift = { gift_name: "мишка", emoji: "🧸" };
+/** A fresh chat starts with a cheerful, usable pool of ten virtual gifts. */
+export const DEFAULT_GIFTS: readonly Gift[] = [
+  { gift_name: "мишка", emoji: "🧸" }, { gift_name: "звезда", emoji: "⭐" },
+  { gift_name: "букет", emoji: "💐" }, { gift_name: "торт", emoji: "🍰" },
+  { gift_name: "ракета", emoji: "🚀" }, { gift_name: "корона", emoji: "👑" },
+  { gift_name: "радуга", emoji: "🌈" }, { gift_name: "конфета", emoji: "🍬" },
+  { gift_name: "воздушный шар", emoji: "🎈" }, { gift_name: "кубок", emoji: "🏆" },
+];
 
 export function defaultGiftState(): GiftState {
-  return { participants: [], gifts: [{ ...TEDDY_BEAR_GIFT }], events: [], settings: { locale: "ru",
-    activeWindowMinutes: 30, repeatProtection: 2, intervalMinMinutes: 1,
+  return { participants: [], gifts: DEFAULT_GIFTS.map((gift) => ({ ...gift })), events: [], settings: { locale: "ru",
+    activeWindowMinutes: 30, repeatProtection: 2, intervalMinMinutes: 5,
     intervalMaxMinutes: 90, mentionFormat: "username", automaticEnabled: false,
   }};
 }
@@ -59,19 +65,13 @@ async function redisState(ctx: Ctx, next?: GiftState): Promise<GiftState | undef
   } finally { client.disconnect(); }
 }
 
-/**
- * Per-chat durable record. Production stores use a Worker Durable Object or Redis;
- * the session fallback is solely the tokenless/local harness fallback supplied by the toolkit.
- */
+/** Per-chat durable record. Production stores use a Worker Durable Object or Redis. */
 export async function readGiftState(ctx: Ctx): Promise<GiftState> {
   const state = await workerState(ctx as Ctx & WorkerLike) ?? await redisState(ctx) ?? (ctx.session.giftState as GiftState | undefined);
   if (!state) return defaultGiftState();
-  // Migrate older chat records in place: the only prize and automatic interval
-  // are now fixed by the product rules, regardless of previous admin choices.
   state.settings.locale = "ru";
-  state.gifts = [{ ...TEDDY_BEAR_GIFT }];
-  state.settings.intervalMinMinutes = 1;
-  state.settings.intervalMaxMinutes = 90;
+  state.settings.intervalMinMinutes = Math.min(90, Math.max(5, state.settings.intervalMinMinutes));
+  state.settings.intervalMaxMinutes = Math.min(90, Math.max(state.settings.intervalMinMinutes, state.settings.intervalMaxMinutes));
   return state;
 }
 export async function writeGiftState(ctx: Ctx, state: GiftState): Promise<void> {

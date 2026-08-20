@@ -1,7 +1,7 @@
 import { Composer } from "grammy";
 import type { Ctx } from "../bot.js";
 import { inlineButton, inlineKeyboard, registerMainMenuItem } from "../toolkit/index.js";
-import { readGiftState, runGiveaway, trackParticipant, writeGiftState } from "../gift-store.js";
+import { DEFAULT_GIFTS, readGiftState, runGiveaway, trackParticipant, writeGiftState, type GiftState } from "../gift-store.js";
 
 registerMainMenuItem({ label: "🎁 Разыграть подарок", data: "gift:run", order: 10 });
 registerMainMenuItem({ label: "⚙️ Настройки розыгрыша", data: "gift:settings", order: 20 });
@@ -40,11 +40,24 @@ function settingsKeyboard() {
     [inlineButton("💬 Формат имени", "gift:mention"), inlineButton("← В меню", "menu:main")],
   ]);
 }
+function giftPoolKeyboard(state: GiftState) {
+  const removeRows = [];
+  for (let index = 0; index < state.gifts.length; index += 2) {
+    removeRows.push(state.gifts.slice(index, index + 2).map((gift, offset) =>
+      inlineButton(`Убрать ${gift.emoji}`, `gift:gifts:remove:${index + offset}`),
+    ));
+  }
+  return inlineKeyboard([
+    ...removeRows,
+    [inlineButton("Восстановить набор", "gift:gifts:restore")],
+    [inlineButton("← Настройки", "gift:settings")],
+  ]);
+}
 function winnerName(person: { username?: string; first_name: string }, mention: "username" | "name"): string {
   return mention === "username" && person.username ? `@${person.username}` : person.first_name;
 }
 function resultText(result: Awaited<ReturnType<typeof runGiveaway>>, mention: "username" | "name"): string {
-  if (result.kind === "winner") return `👏 Победитель: ${winnerName(result.participant, mention)} — получает мишка!`;
+  if (result.kind === "winner") return `👏 Победитель: ${winnerName(result.participant, mention)} — получает ${result.gift.emoji} ${result.gift.gift_name}!`;
   if (result.kind === "empty-gifts") return "Подарок ещё не готов — попробуйте чуть позже.";
   if (result.kind === "no-active") return "Пока никто не был активен — дайте чату оживиться и попробуйте ещё раз.";
   return "Все активные участники недавно выигрывали — дайте чату немного времени и попробуйте ещё раз.";
@@ -90,9 +103,25 @@ composer.callbackQuery("gift:settings", async (ctx) => {
 
 composer.callbackQuery("gift:gifts", async (ctx) => {
   await acknowledge(ctx);
-  await editOrReply(ctx, "В этом розыгрыше всегда разыгрывается мишка.", inlineKeyboard([
-    [inlineButton("← Настройки", "gift:settings")],
-  ]));
+  const state = await readGiftState(ctx);
+  const gifts = state.gifts.map((gift) => `${gift.emoji} ${gift.gift_name}`).join(" · ");
+  await editOrReply(ctx, state.gifts.length ? `Сейчас в пуле: ${gifts}.` : "Пул подарков пуст — восстановите набор, чтобы продолжить игру.", giftPoolKeyboard(state));
+});
+composer.callbackQuery(/^gift:gifts:remove:(\d+)$/, async (ctx) => {
+  await acknowledge(ctx);
+  const index = Number(ctx.match[1]);
+  const state = await readGiftState(ctx);
+  if (index < state.gifts.length) state.gifts.splice(index, 1);
+  await writeGiftState(ctx, state);
+  const gifts = state.gifts.map((gift) => `${gift.emoji} ${gift.gift_name}`).join(" · ");
+  await editOrReply(ctx, state.gifts.length ? `Сейчас в пуле: ${gifts}.` : "Пул подарков пуст — восстановите набор, чтобы продолжить игру.", giftPoolKeyboard(state));
+});
+composer.callbackQuery("gift:gifts:restore", async (ctx) => {
+  await acknowledge(ctx);
+  const state = await readGiftState(ctx);
+  state.gifts = DEFAULT_GIFTS.map((gift) => ({ ...gift }));
+  await writeGiftState(ctx, state);
+  await editOrReply(ctx, "Пул подарков снова полный и готов к веселью!", giftPoolKeyboard(state));
 });
 
 composer.callbackQuery("gift:window", async (ctx) => {
@@ -128,9 +157,9 @@ composer.callbackQuery("gift:auto", async (ctx) => {
   await acknowledge(ctx);
   const state = await readGiftState(ctx);
   const status = state.settings.automaticEnabled ? "включены" : "выключены";
-  await editOrReply(ctx, `Автоподарки ${status}. Новый подарок выбирается через случайный промежуток от 1 до 90 минут.`, inlineKeyboard([
+  await editOrReply(ctx, `Автоподарки ${status}. Новый подарок выбирается через случайный промежуток от ${state.settings.intervalMinMinutes} до ${state.settings.intervalMaxMinutes} минут.`, inlineKeyboard([
     [inlineButton("Включить", "gift:auto:on"), inlineButton("Выключить", "gift:auto:off")],
-    [inlineButton("Интервал 1–90 минут", "gift:interval:1:90")],
+    [inlineButton("Настроить интервал", "gift:interval")],
     [inlineButton("← Настройки", "gift:settings")],
   ]));
 });
@@ -138,14 +167,25 @@ composer.callbackQuery(/^gift:auto:(on|off)$/, async (ctx) => {
   await acknowledge(ctx);
   const on = ctx.match[1] === "on"; const state = await readGiftState(ctx);
   state.settings.automaticEnabled = on;
-  state.settings.intervalMinMinutes = 1; state.settings.intervalMaxMinutes = 90;
+  state.settings.intervalMinMinutes = 5; state.settings.intervalMaxMinutes = 90;
   await writeGiftState(ctx, state);
-  await editOrReply(ctx, on ? "Автоподарки включены — начинаем веселье! Интервал: от 1 до 90 минут." : "Автоподарки на паузе.", settingsKeyboard());
+  await editOrReply(ctx, on ? "Автоподарки включены — начинаем веселье! Интервал: от 5 до 90 минут." : "Автоподарки на паузе.", settingsKeyboard());
 });
-composer.callbackQuery("gift:interval:1:90", async (ctx) => {
+composer.callbackQuery("gift:interval", async (ctx) => {
   await acknowledge(ctx);
-  const state = await readGiftState(ctx); state.settings.intervalMinMinutes = 1; state.settings.intervalMaxMinutes = 90; await writeGiftState(ctx, state);
-  await editOrReply(ctx, "Автоподарки проходят через случайный промежуток от 1 до 90 минут.", settingsKeyboard());
+  await editOrReply(ctx, "Выберите диапазон для автоподарков.", inlineKeyboard([
+    [inlineButton("5–30 минут", "gift:interval:5:30"), inlineButton("15–60 минут", "gift:interval:15:60")],
+    [inlineButton("30–90 минут", "gift:interval:30:90"), inlineButton("← Настройки", "gift:settings")],
+  ]));
+});
+composer.callbackQuery(/^gift:interval:(5:30|15:60|30:90)$/, async (ctx) => {
+  await acknowledge(ctx);
+  const [min, max] = ctx.match[1].split(":").map(Number);
+  const state = await readGiftState(ctx);
+  state.settings.intervalMinMinutes = min;
+  state.settings.intervalMaxMinutes = max;
+  await writeGiftState(ctx, state);
+  await editOrReply(ctx, `Автоподарки будут проходить через случайный промежуток от ${min} до ${max} минут.`, settingsKeyboard());
 });
 
 composer.callbackQuery("gift:mention", async (ctx) => {

@@ -1,12 +1,21 @@
 [
   {
+    "name": "ordinary activity is recorded without a chat reply",
+    "strict": true,
+    "steps": [
+      {
+        "send": { "text": "Я здесь!", "chatId": -100, "userId": 7 },
+        "expect": []
+      }
+    ]
+  },
+  {
     "name": "/gift",
     "steps": [
       {
         "expect": [
           {
-            "method": "sendMessage",
-            "payload": { "text": "👏 Победитель: Test — получает мишка!" }
+            "method": "sendMessage"
           }
         ],
         "send": {
